@@ -1,24 +1,61 @@
-import logo from './logo.svg';
-import './App.css';
+import { useState, useEffect } from 'react';
+import { LoginPage, RegisterPage } from './pages/Auth';
+import { Dashboard } from './pages/Dashboard';
 
 function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  const handleLogin = () => {
+    setIsAuthenticated(true);
+  };
+
+  const handleRegister = () => {
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setIsAuthenticated(false);
+  };
+
+  if (isAuthenticated) {
+    return <Dashboard onLogout={handleLogout} />;
+  }
+
+  return showRegister ? (
+    <>
+      <RegisterPage onRegister={handleRegister} />
+      <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+        已有账号?{' '}
+        <button
+          onClick={() => setShowRegister(false)}
+          style={{ background: 'none', border: 'none', color: '#2196F3', cursor: 'pointer' }}
         >
-          Learn React
-        </a>
-      </header>
-    </div>
+          登录
+        </button>
+      </div>
+    </>
+  ) : (
+    <>
+      <LoginPage onLogin={handleLogin} />
+      <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+        没有账号?{' '}
+        <button
+          onClick={() => setShowRegister(true)}
+          style={{ background: 'none', border: 'none', color: '#2196F3', cursor: 'pointer' }}
+        >
+          注册
+        </button>
+      </div>
+    </>
   );
 }
 
