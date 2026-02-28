@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { LoginPage, RegisterPage } from './pages/Auth';
 import { Dashboard } from './pages/Dashboard';
-import { Button } from 'antd';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -32,19 +31,15 @@ function App() {
   }
 
   return showRegister ? (
-    <>
-      <RegisterPage onRegister={handleRegister} />
-      <div style={{ textAlign: 'center', marginTop: '16px' }}>
-        已有账号? <Button type="link" onClick={() => setShowRegister(false)}>登录</Button>
-      </div>
-    </>
+    <RegisterPage
+      onRegister={handleRegister}
+      onSwitchToLogin={() => setShowRegister(false)}
+    />
   ) : (
-    <>
-      <LoginPage onLogin={handleLogin} />
-      <div style={{ textAlign: 'center', marginTop: '16px' }}>
-        没有账号? <Button type="link" onClick={() => setShowRegister(true)}>注册</Button>
-      </div>
-    </>
+    <LoginPage
+      onLogin={handleLogin}
+      onSwitchToRegister={() => setShowRegister(true)}
+    />
   );
 }
 

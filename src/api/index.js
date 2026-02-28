@@ -7,12 +7,29 @@ const getAuthHeader = () => {
 
 export const api = {
   // Auth
-  register: async (email, password, displayName, avatar) => {
+  sendVerificationCode: async (email) => {
+    const res = await fetch(`${API_BASE}/auth/send-verification?email=${encodeURIComponent(email)}`, {
+      method: 'POST',
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Failed to send code');
+    }
+    return res.json();
+  },
+
+  register: async (email, password, displayName, code, avatar) => {
     const formData = new FormData();
     formData.append('email', email);
     formData.append('password', password);
+    formData.append('code', code);
     if (displayName) formData.append('display_name', displayName);
-    if (avatar) formData.append('avatar', avatar);
+    if (avatar) {
+      console.log('Uploading avatar:', avatar);
+      formData.append('avatar', avatar);
+    } else {
+      console.log('No avatar to upload');
+    }
 
     const res = await fetch(`${API_BASE}/auth/register`, {
       method: 'POST',
@@ -119,7 +136,7 @@ export const api = {
 
   // Expenses
   getExpenses: async (ledgerId) => {
-    const res = await fetch(`${API_BASE}/ledgers/${ledgerId}/expenses`, {
+    const res = await fetch(`${API_BASE}/expenses/ledgers/${ledgerId}/expenses`, {
       headers: { ...getAuthHeader() },
     });
     if (!res.ok) throw new Error('Failed to get expenses');
@@ -127,7 +144,7 @@ export const api = {
   },
 
   createExpense: async (ledgerId, expense) => {
-    const res = await fetch(`${API_BASE}/ledgers/${ledgerId}/expenses`, {
+    const res = await fetch(`${API_BASE}/expenses/ledgers/${ledgerId}/expenses`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

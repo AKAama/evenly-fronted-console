@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import { Card, Row, Col, Button, Modal, Form, Input, Select, DatePicker, Table, Tag, message, Popconfirm, Space, Avatar, List, InputNumber } from 'antd';
-import { PlusOutlined, DeleteOutlined, UserAddOutlined, DollarOutlined, SwapOutlined, LogoutOutlined, ArrowLeftOutlined } from '@ant-design/icons';
+import { Card, Row, Col, Button, Modal, Form, Input, Select, DatePicker, Table, Tag, message, Popconfirm, Space, Avatar, List, InputNumber, Tabs, Tooltip } from 'antd';
+import { PlusOutlined, DeleteOutlined, UserAddOutlined, DollarOutlined, SwapOutlined, LogoutOutlined, ArrowLeftOutlined, ReloadOutlined, ExportOutlined } from '@ant-design/icons';
+import html2canvas from 'html2canvas';
 import dayjs from 'dayjs';
 
 export function Dashboard({ onLogout }) {
@@ -76,7 +77,7 @@ export function Dashboard({ onLogout }) {
           <Row gutter={[16, 16]}>
             {ledgers.map((ledger) => (
               <Col xs={24} sm={12} md={8} lg={6} key={ledger.id}>
-                <Card hoverable style={styles.ledgerCard} onClick={() => api.getLedger(ledger.id).then(setSelectedLedger)}>
+                <Card hoverable style={styles.ledgerCard} onClick={() => setSelectedLedger(ledger)}>
                   <Card.Meta
                     avatar={<Avatar style={{ backgroundColor: '#1890ff' }}>{ledger.name[0]}</Avatar>}
                     title={ledger.name}
@@ -133,9 +134,11 @@ function LedgerDetail({ ledger, onBack, onRefresh }) {
   const [expenses, setExpenses] = useState([]);
   const [settlements, setSettlements] = useState([]);
   const [activeTab, setActiveTab] = useState('expenses');
+  const [currentUser, setCurrentUser] = useState(null);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [createExpenseOpen, setCreateExpenseOpen] = useState(false);
   const [createSettlementOpen, setCreateSettlementOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -145,16 +148,38 @@ function LedgerDetail({ ledger, onBack, onRefresh }) {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [membersData, expensesData, settlementsData] = await Promise.all([
-        api.getMembers(ledger.id),
-        api.getExpenses(ledger.id),
-        api.getSettlements(ledger.id),
-      ]);
+      // 获取当前用户信息
+      const userData = await api.getMe();
+      setCurrentUser(userData);
+
+      // 先获取成员，因为其他操作需要成员信息
+      const membersData = await api.getMembers(ledger.id);
       setMembers(membersData);
-      setExpenses(expensesData);
-      setSettlements(settlementsData);
+
+      // 如果没有成员，不请求 expenses 和 settlements
+      if (membersData.length === 0) {
+        setExpenses([]);
+        setSettlements([]);
+      } else {
+        // 并行获取 expenses 和 settlements
+        const [expensesData, settlementsData] = await Promise.all([
+          api.getExpenses(ledger.id),
+          api.getSettlements(ledger.id),
+        ]);
+        setExpenses(expensesData);
+        setSettlements(settlementsData);
+      }
     } catch (err) {
-      message.error(err.message);
+      console.error('Failed to load ledger data:', err);
+      // 如果是 403 错误，说明不是成员，重置数据
+      if (err.message?.includes('Not a member')) {
+        message.error('您不是该账本成员');
+        setMembers([]);
+        setExpenses([]);
+        setSettlements([]);
+      } else {
+        message.error(err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -164,36 +189,118 @@ function LedgerDetail({ ledger, onBack, onRefresh }) {
     try {
       await api.confirmExpense(expenseId, status);
       message.success(status === 'confirmed' ? '已确认' : '已拒绝');
-      loadData();
+      // 立即更新本地状态，让按钮立即消失，同时添加确认记录
+      setExpenses(prev => prev.map(exp => {
+        if (exp.id === expenseId) {
+          return {
+            ...exp,
+            status: status === 'confirmed' ? 'confirmed' : 'rejected',
+            confirmations: [
+              ...(exp.confirmations || []),
+              { user_id: currentUser?.id, status: status }
+            ]
+          };
+        }
+        return exp;
+      }));
     } catch (err) {
       message.error(err.message);
+      // 如果是已确认错误，刷新数据
+      if (err.message?.includes('already responded')) {
+        loadData();
+      }
+    }
+  };
+
+  const handleExportImage = async () => {
+    setExportOpen(true);
+  };
+
+  const handleExportConfirm = async () => {
+    const element = document.getElementById('export-preview');
+    if (!element) return;
+
+    try {
+      message.loading({ content: '正在导出...', key: 'export' });
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        logging: false,
+      });
+      const data = canvas.toDataURL('image/png');
+
+      const link = document.createElement('a');
+      link.href = data;
+      link.download = `${ledger.name}_${dayjs().format('YYYY-MM-DD')}.png`;
+      link.click();
+
+      message.success({ content: '导出成功', key: 'export' });
+    } catch (err) {
+      message.error({ content: '导出失败', key: 'export' });
     }
   };
 
   const expenseColumns = [
     { title: '标题', dataIndex: 'title', key: 'title', render: (t) => t || '未命名支出' },
-    { title: '金额', dataIndex: 'total_amount', key: 'amount', render: (v) => <span style={{ color: '#52c41a', fontWeight: bold }}>¥{v}</span> },
+    { title: '金额', dataIndex: 'total_amount', key: 'amount', render: (v) => <span style={{ color: '#52c41a', fontWeight: 'bold' }}>¥{v}</span> },
     { title: '付款人', key: 'payer', render: (_, r) => r.payer?.display_name || r.payer?.email },
     { title: '日期', dataIndex: 'expense_date', key: 'date' },
-    { 
-      title: '状态', 
-      dataIndex: 'status', 
-      key: 'status',
-      render: (s) => {
-        const map = { pending: 'orange', confirmed: 'green', rejected: 'red' };
-        const text = { pending: '待确认', confirmed: '已确认', rejected: '已拒绝' };
-        return <Tag color={map[s]}>{text[s]}</Tag>;
-      }
+    {
+      title: '确认状态',
+      key: 'confirmations',
+      render: (_, r) => {
+        // 只显示参与了该支出的成员（通过 splits 确定）
+        const splitUserIds = r.splits?.map(s => s.user_id) || [];
+        if (splitUserIds.length === 0) return '-';
+
+        return (
+          <Space size={4}>
+            {splitUserIds.map(userId => {
+              const member = members.find(m => m.user_id === userId);
+              const confirmation = r.confirmations?.find(c => c.user_id === userId);
+              const memberName = member?.nickname || member?.user?.display_name || member?.user?.email || '?';
+
+              if (confirmation?.status === 'confirmed') {
+                return (
+                  <Tooltip key={userId} title={`${memberName}: 已确认`}>
+                    <Avatar size={24} style={{ backgroundColor: '#52c41a', fontSize: 12 }}>✓</Avatar>
+                  </Tooltip>
+                );
+              } else if (confirmation?.status === 'rejected') {
+                return (
+                  <Tooltip key={userId} title={`${memberName}: 已拒绝`}>
+                    <Avatar size={24} style={{ backgroundColor: '#ff4d4f', fontSize: 12 }}>✕</Avatar>
+                  </Tooltip>
+                );
+              } else {
+                return (
+                  <Tooltip key={userId} title={`${memberName}: 待确认`}>
+                    <Avatar size={24} style={{ backgroundColor: '#d9d9d9', fontSize: 12, color: '#fff' }}>?</Avatar>
+                  </Tooltip>
+                );
+              }
+            })}
+          </Space>
+        );
+      },
     },
     {
       title: '操作',
       key: 'action',
-      render: (_, r) => r.status === 'pending' ? (
-        <Space>
-          <Button type="link" size="small" onClick={() => handleConfirmExpense(r.id, 'confirmed')}>确认</Button>
-          <Button type="link" danger size="small" onClick={() => handleConfirmExpense(r.id, 'rejected')}>拒绝</Button>
-        </Space>
-      ) : '-',
+      render: (_, r) => {
+        // 如果不是待确认状态，不显示按钮
+        if (r.status !== 'pending') return '-';
+        // 检查当前用户是否已经确认过
+        const hasConfirmed = r.confirmations?.some(c => c.user_id === currentUser?.id);
+        if (hasConfirmed) return '已确认';
+        return (
+          <Space>
+            <Button type="link" size="small" onClick={() => handleConfirmExpense(r.id, 'confirmed')}>确认</Button>
+            <Button type="link" danger size="small" onClick={() => handleConfirmExpense(r.id, 'rejected')}>拒绝</Button>
+          </Space>
+        );
+      },
     },
   ];
 
@@ -212,15 +319,15 @@ function LedgerDetail({ ledger, onBack, onRefresh }) {
   ];
 
   const settlementColumns = [
-    { 
-      title: '从', 
+    {
+      title: '从',
       key: 'from',
-      render: (_, r) => r.from_user?.display_name || r.from_user?.email
+      render: (_, r) => r.from_user_name || '-'
     },
-    { 
-      title: '到', 
+    {
+      title: '到',
       key: 'to',
-      render: (_, r) => r.to_user?.display_name || r.to_user?.email
+      render: (_, r) => r.to_user_name || '-'
     },
     { 
       title: '金额', 
@@ -233,14 +340,14 @@ function LedgerDetail({ ledger, onBack, onRefresh }) {
 
   return (
     <div style={styles.container}>
-      <Card 
+      <Card
         title={
           <Space>
             <Button icon={<ArrowLeftOutlined />} onClick={onBack} />
             <span>{ledger.name}</span>
           </Space>
         }
-        extra={<Button onClick={onBack}>返回</Button>}
+        extra={<Space><Button icon={<ExportOutlined />} onClick={handleExportImage}>导出</Button><Button icon={<ReloadOutlined />} onClick={loadData}>刷新</Button><Button onClick={onBack}>返回</Button></Space>}
         style={styles.mainCard}
       >
         <Card type="inner" extra={
@@ -253,17 +360,11 @@ function LedgerDetail({ ledger, onBack, onRefresh }) {
           成员 {members.length} | 支出 {expenses.length} | 结算 {settlements.length}
         </Card>
 
-        <Tabs activeKey={activeTab} onChange={setActiveTab} style={{ marginTop: '16px' }}>
-          <Tabs.TabPane tab={`支出 (${expenses.length})`} key="expenses">
-            <Table columns={expenseColumns} dataSource={expenses} rowKey="id" loading={loading} pagination={false} />
-          </Tabs.TabPane>
-          <Tabs.TabPane tab={`成员 (${members.length})`} key="members">
-            <Table columns={memberColumns} dataSource={members} rowKey="user_id" loading={loading} pagination={false} />
-          </Tabs.TabPane>
-          <Tabs.TabPane tab={`结算 (${settlements.length})`} key="settlements">
-            <Table columns={settlementColumns} dataSource={settlements} rowKey="id" loading={loading} pagination={false} />
-          </Tabs.TabPane>
-        </Tabs>
+        <Tabs activeKey={activeTab} onChange={setActiveTab} style={{ marginTop: '16px' }} items={[
+          { key: 'expenses', label: `支出 (${expenses.length})`, children: <Table columns={expenseColumns} dataSource={expenses} rowKey="id" loading={loading} pagination={false} /> },
+          { key: 'members', label: `成员 (${members.length})`, children: <Table columns={memberColumns} dataSource={members} rowKey="user_id" loading={loading} pagination={false} /> },
+          { key: 'settlements', label: `结算 (${settlements.length})`, children: <Table columns={settlementColumns} dataSource={settlements} rowKey="id" loading={loading} pagination={false} /> },
+        ]} />
       </Card>
 
       <AddMemberModal
@@ -289,11 +390,19 @@ function LedgerDetail({ ledger, onBack, onRefresh }) {
         members={members}
         onSuccess={() => { setCreateSettlementOpen(false); loadData(); }}
       />
+
+      <ExportPreviewModal
+        open={exportOpen}
+        onCancel={() => setExportOpen(false)}
+        ledger={ledger}
+        members={members}
+        expenses={expenses}
+        settlements={settlements}
+        onExport={handleExportConfirm}
+      />
     </div>
   );
 }
-
-import Tabs from 'antd/es/tabs';
 
 function AddMemberModal({ open, onCancel, ledgerId, existingIds, onSuccess }) {
   const [search, setSearch] = useState('');
@@ -484,6 +593,108 @@ function CreateSettlementModal({ open, onCancel, ledgerId, members, onSuccess })
           <Input placeholder="如：还饭钱" />
         </Form.Item>
       </Form>
+    </Modal>
+  );
+}
+
+function ExportPreviewModal({ open, onCancel, ledger, members, expenses, settlements, onExport }) {
+  // 计算统计数据
+  const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.total_amount), 0);
+  const confirmedCount = expenses.filter(e => e.status === 'confirmed').length;
+  const pendingCount = expenses.filter(e => e.status === 'pending').length;
+
+  return (
+    <Modal
+      title="导出预览"
+      open={open}
+      onCancel={onCancel}
+      width={600}
+      footer={[
+        <Button key="cancel" onClick={onCancel}>取消</Button>,
+        <Button key="export" type="primary" onClick={onExport}>确认导出</Button>
+      ]}
+    >
+      <div id="export-preview" style={{ padding: '24px', background: '#fff', minHeight: '400px' }}>
+        {/* 头部 */}
+        <div style={{ textAlign: 'center', marginBottom: '24px', borderBottom: '2px solid #1890ff', paddingBottom: '16px' }}>
+          <h1 style={{ margin: 0, color: '#1890ff', fontSize: '24px' }}>{ledger.name}</h1>
+          <p style={{ margin: '8px 0 0', color: '#666' }}>账本汇总</p>
+        </div>
+
+        {/* 统计卡片 */}
+        <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
+          <Col span={8}>
+            <div style={{ textAlign: 'center', padding: '16px', background: '#f0f5ff', borderRadius: '8px' }}>
+              <div style={{ fontSize: '12px', color: '#666' }}>总支出</div>
+              <div style={{ fontSize: '24px', color: '#1890ff', fontWeight: 'bold' }}>¥{totalExpenses.toFixed(2)}</div>
+            </div>
+          </Col>
+          <Col span={8}>
+            <div style={{ textAlign: 'center', padding: '16px', background: '#f6ffed', borderRadius: '8px' }}>
+              <div style={{ fontSize: '12px', color: '#666' }}>参与人数</div>
+              <div style={{ fontSize: '24px', color: '#52c41a', fontWeight: 'bold' }}>{members.length}</div>
+            </div>
+          </Col>
+          <Col span={8}>
+            <div style={{ textAlign: 'center', padding: '16px', background: '#fff7e6', borderRadius: '8px' }}>
+              <div style={{ fontSize: '12px', color: '#666' }}>支出记录</div>
+              <div style={{ fontSize: '24px', color: '#fa8c16', fontWeight: 'bold' }}>{expenses.length}</div>
+            </div>
+          </Col>
+        </Row>
+
+        {/* 成员列表 */}
+        <div style={{ marginBottom: '24px' }}>
+          <h3 style={{ fontSize: '14px', color: '#333', borderLeft: '3px solid #1890ff', paddingLeft: '8px', marginBottom: '12px' }}>参与成员</h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {members.map(m => (
+              <Tag key={m.user_id} color="blue" style={{ padding: '4px 12px' }}>
+                {m.nickname || m.user?.display_name || m.user?.email}
+              </Tag>
+            ))}
+          </div>
+        </div>
+
+        {/* 支出明细 */}
+        <div style={{ marginBottom: '24px' }}>
+          <h3 style={{ fontSize: '14px', color: '#333', borderLeft: '3px solid #52c41a', paddingLeft: '8px', marginBottom: '12px' }}>支出明细</h3>
+          <Table
+            size="small"
+            dataSource={expenses}
+            rowKey="id"
+            pagination={false}
+            columns={[
+              { title: '标题', dataIndex: 'title', render: (t) => t || '未命名' },
+              { title: '金额', dataIndex: 'total_amount', render: (v) => `¥${Number(v).toFixed(2)}` },
+              { title: '付款人', render: (_, r) => r.payer?.display_name || r.payer?.email || '-' },
+              { title: '状态', dataIndex: 'status', render: (s) => s === 'confirmed' ? '已确认' : s === 'rejected' ? '已拒绝' : '待确认' },
+            ]}
+          />
+        </div>
+
+        {/* 结算建议 */}
+        {settlements.length > 0 && (
+          <div>
+            <h3 style={{ fontSize: '14px', color: '#333', borderLeft: '3px solid #722ed1', paddingLeft: '8px', marginBottom: '12px' }}>结算建议</h3>
+            <Table
+              size="small"
+              dataSource={settlements}
+              rowKey="id"
+              pagination={false}
+              columns={[
+                { title: '付款人', render: (_, r) => r.from_user_name },
+                { title: '收款人', render: (_, r) => r.to_user_name },
+                { title: '金额', render: (_, r) => `¥${Number(r.amount).toFixed(2)}` },
+              ]}
+            />
+          </div>
+        )}
+
+        {/* 底部 */}
+        <div style={{ textAlign: 'center', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #eee', color: '#999', fontSize: '12px' }}>
+          生成于 {dayjs().format('YYYY-MM-DD HH:mm:ss')}
+        </div>
+      </div>
     </Modal>
   );
 }

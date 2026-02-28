@@ -3,7 +3,7 @@ import { api } from '../api';
 import { Form, Input, Button, Card, message, Upload } from 'antd';
 import { UserOutlined, LockOutlined, MailOutlined, UploadOutlined } from '@ant-design/icons';
 
-export function LoginPage({ onLogin }) {
+export function LoginPage({ onLogin, onSwitchToRegister }) {
   const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
 
@@ -40,40 +40,57 @@ export function LoginPage({ onLogin }) {
             </Button>
           </Form.Item>
         </Form>
+        <div style={styles.switchLink}>
+          没有账号? <Button type="link" onClick={onSwitchToRegister}>立即注册</Button>
+        </div>
       </Card>
     </div>
   );
 }
 
-export function RegisterPage({ onRegister }) {
+export function RegisterPage({ onRegister, onSwitchToLogin }) {
   const [loading, setLoading] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [countdown, setCountdown] = useState(0);
   const [form] = Form.useForm();
+
+  const handleSendCode = async () => {
+    try {
+      const email = form.getFieldValue('email');
+      if (!email) {
+        message.warning('请先输入邮箱');
+        return;
+      }
+      setSendingCode(true);
+      await api.sendVerificationCode(email);
+      message.success('验证码已发送');
+      setCountdown(6);
+      const timer = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch (err) {
+      message.error(err.message || '发送失败');
+    } finally {
+      setSendingCode(false);
+    }
+  };
 
   const onFinish = async (values) => {
     setLoading(true);
     try {
-      const formData = new FormData();
-      formData.append('email', values.email);
-      formData.append('password', values.password);
-      formData.append('display_name', values.displayName);
-      if (values.avatar?.fileList?.[0]) {
-        formData.append('avatar', values.avatar.fileList[0].originFileObj);
-      }
-
-      const res = await fetch('http://localhost:8000/auth/register', {
-        method: 'POST',
-        body: formData,
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || '注册失败');
-      }
-      const data = await res.json();
+      const avatar = values.avatar?.[0]?.originFileObj;
+      const data = await api.register(values.email, values.password, values.displayName, values.code, avatar);
       localStorage.setItem('token', data.access_token);
       message.success('注册成功');
       onRegister();
     } catch (err) {
-      message.error(err.message);
+      message.error(err.message || '注册失败');
     } finally {
       setLoading(false);
     }
@@ -88,6 +105,16 @@ export function RegisterPage({ onRegister }) {
             rules={[{ required: true, message: '请输入邮箱' }, { type: 'email', message: '邮箱格式不正确' }]}
           >
             <Input prefix={<MailOutlined />} placeholder="邮箱" size="large" />
+          </Form.Item>
+          <Form.Item name="code" rules={[{ required: true, message: '请输入验证码' }]}>
+            <Input.Search
+              placeholder="验证码"
+              enterButton={countdown > 0 ? `${countdown}s` : '发送验证码'}
+              onSearch={handleSendCode}
+              loading={sendingCode}
+              disabled={countdown > 0}
+              size="large"
+            />
           </Form.Item>
           <Form.Item name="displayName" rules={[{ required: true, message: '请输入显示名称' }]}>
             <Input prefix={<UserOutlined />} placeholder="显示名称" size="large" />
@@ -119,6 +146,9 @@ export function RegisterPage({ onRegister }) {
             </Button>
           </Form.Item>
         </Form>
+        <div style={styles.switchLink}>
+          已有账号? <Button type="link" onClick={onSwitchToLogin}>立即登录</Button>
+        </div>
       </Card>
     </div>
   );
@@ -137,5 +167,11 @@ const styles = {
     maxWidth: '400px',
     borderRadius: '8px',
     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+  },
+  switchLink: {
+    textAlign: 'center',
+    marginTop: '8px',
+    paddingTop: '8px',
+    borderTop: '1px solid #f0f0f0',
   },
 };
