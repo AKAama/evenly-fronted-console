@@ -655,6 +655,24 @@ function ExportPreviewModal({ open, onCancel, ledger, members, expenses, settlem
           </div>
         </div>
 
+        {/* 结算建议 */}
+        {settlements.length > 0 && (
+            <div>
+              <h3 style={{ fontSize: '14px', color: '#333', borderLeft: '3px solid #722ed1', paddingLeft: '8px', marginBottom: '12px' }}>结算建议</h3>
+              <Table
+                  size="small"
+                  dataSource={settlements}
+                  rowKey="id"
+                  pagination={false}
+                  columns={[
+                    { title: '付款人', render: (_, r) => r.from_user_name },
+                    { title: '收款人', render: (_, r) => r.to_user_name },
+                    { title: '金额', render: (_, r) => `¥${Number(r.amount).toFixed(2)}` },
+                  ]}
+              />
+            </div>
+        )}
+
         {/* 支出明细 */}
         <div style={{ marginBottom: '24px' }}>
           <h3 style={{ fontSize: '14px', color: '#333', borderLeft: '3px solid #52c41a', paddingLeft: '8px', marginBottom: '12px' }}>支出明细</h3>
@@ -671,24 +689,6 @@ function ExportPreviewModal({ open, onCancel, ledger, members, expenses, settlem
             ]}
           />
         </div>
-
-        {/* 结算建议 */}
-        {settlements.length > 0 && (
-          <div>
-            <h3 style={{ fontSize: '14px', color: '#333', borderLeft: '3px solid #722ed1', paddingLeft: '8px', marginBottom: '12px' }}>结算建议</h3>
-            <Table
-              size="small"
-              dataSource={settlements}
-              rowKey="id"
-              pagination={false}
-              columns={[
-                { title: '付款人', render: (_, r) => r.from_user_name },
-                { title: '收款人', render: (_, r) => r.to_user_name },
-                { title: '金额', render: (_, r) => `¥${Number(r.amount).toFixed(2)}` },
-              ]}
-            />
-          </div>
-        )}
 
         {/* 底部 */}
         <div style={{ textAlign: 'center', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #eee', color: '#999', fontSize: '12px' }}>
