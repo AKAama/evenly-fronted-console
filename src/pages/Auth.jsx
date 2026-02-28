@@ -1,22 +1,21 @@
 import { useState } from 'react';
 import { api } from '../api';
+import { Form, Input, Button, Card, message, Upload } from 'antd';
+import { UserOutlined, LockOutlined, MailOutlined, UploadOutlined } from '@ant-design/icons';
 
 export function LoginPage({ onLogin }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [form] = Form.useForm();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
+  const onFinish = async (values) => {
     setLoading(true);
     try {
-      const data = await api.login(email, password);
+      const data = await api.login(values.email, values.password);
       localStorage.setItem('token', data.access_token);
+      message.success('登录成功');
       onLogin();
     } catch (err) {
-      setError(err.message);
+      message.error(err.message || '登录失败');
     } finally {
       setLoading(false);
     }
@@ -24,53 +23,57 @@ export function LoginPage({ onLogin }) {
 
   return (
     <div style={styles.container}>
-      <div style={styles.card}>
-        <h2>登录</h2>
-        {error && <div style={styles.error}>{error}</div>}
-        <form onSubmit={handleSubmit}>
-          <input
-            type="email"
-            placeholder="邮箱"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={styles.input}
-            required
-          />
-          <input
-            type="password"
-            placeholder="密码"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={styles.input}
-            required
-          />
-          <button type="submit" style={styles.button} disabled={loading}>
-            {loading ? '登录中...' : '登录'}
-          </button>
-        </form>
-      </div>
+      <Card title="登录" style={styles.card}>
+        <Form form={form} onFinish={onFinish} layout="vertical">
+          <Form.Item
+            name="email"
+            rules={[{ required: true, message: '请输入邮箱' }, { type: 'email', message: '邮箱格式不正确' }]}
+          >
+            <Input prefix={<MailOutlined />} placeholder="邮箱" size="large" />
+          </Form.Item>
+          <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
+            <Input.Password prefix={<LockOutlined />} placeholder="密码" size="large" />
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" htmlType="submit" loading={loading} block size="large">
+              登录
+            </Button>
+          </Form.Item>
+        </Form>
+      </Card>
     </div>
   );
 }
 
 export function RegisterPage({ onRegister }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [avatar, setAvatar] = useState(null);
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [form] = Form.useForm();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
+  const onFinish = async (values) => {
     setLoading(true);
     try {
-      const data = await api.register(email, password, displayName, avatar);
+      const formData = new FormData();
+      formData.append('email', values.email);
+      formData.append('password', values.password);
+      formData.append('display_name', values.displayName);
+      if (values.avatar?.fileList?.[0]) {
+        formData.append('avatar', values.avatar.fileList[0].originFileObj);
+      }
+
+      const res = await fetch('http://localhost:8000/auth/register', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || '注册失败');
+      }
+      const data = await res.json();
       localStorage.setItem('token', data.access_token);
+      message.success('注册成功');
       onRegister();
     } catch (err) {
-      setError(err.message);
+      message.error(err.message);
     } finally {
       setLoading(false);
     }
@@ -78,46 +81,45 @@ export function RegisterPage({ onRegister }) {
 
   return (
     <div style={styles.container}>
-      <div style={styles.card}>
-        <h2>注册</h2>
-        {error && <div style={styles.error}>{error}</div>}
-        <form onSubmit={handleSubmit}>
-          <input
-            type="email"
-            placeholder="邮箱"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={styles.input}
-            required
-          />
-          <input
-            type="text"
-            placeholder="显示名称"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            style={styles.input}
-          />
-          <input
-            type="password"
-            placeholder="密码"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={styles.input}
-            required
-          />
-          <div style={styles.fileInput}>
-            <label>头像 (可选): </label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setAvatar(e.target.files[0])}
-            />
-          </div>
-          <button type="submit" style={styles.button} disabled={loading}>
-            {loading ? '注册中...' : '注册'}
-          </button>
-        </form>
-      </div>
+      <Card title="注册" style={styles.card}>
+        <Form form={form} onFinish={onFinish} layout="vertical">
+          <Form.Item
+            name="email"
+            rules={[{ required: true, message: '请输入邮箱' }, { type: 'email', message: '邮箱格式不正确' }]}
+          >
+            <Input prefix={<MailOutlined />} placeholder="邮箱" size="large" />
+          </Form.Item>
+          <Form.Item name="displayName" rules={[{ required: true, message: '请输入显示名称' }]}>
+            <Input prefix={<UserOutlined />} placeholder="显示名称" size="large" />
+          </Form.Item>
+          <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }, { min: 6, message: '密码至少6位' }]}>
+            <Input.Password prefix={<LockOutlined />} placeholder="密码" size="large" />
+          </Form.Item>
+          <Form.Item name="confirmPassword" dependencies={['password']}
+            rules={[
+              { required: true, message: '请确认密码' },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('password') === value) return Promise.resolve();
+                  return Promise.reject(new Error('两次密码不一致'));
+                },
+              }),
+            ]}
+          >
+            <Input.Password prefix={<LockOutlined />} placeholder="确认密码" size="large" />
+          </Form.Item>
+          <Form.Item name="avatar" valuePropName="fileList" getValueFromEvent={(e) => e?.fileList}>
+            <Upload beforeUpload={() => false} maxCount={1} listType="picture">
+              <Button icon={<UploadOutlined />}>上传头像（可选）</Button>
+            </Upload>
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" htmlType="submit" loading={loading} block size="large">
+              注册
+            </Button>
+          </Form.Item>
+        </Form>
+      </Card>
     </div>
   );
 }
@@ -128,42 +130,12 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: '#f5f5f5',
+    background: '#f0f2f5',
   },
   card: {
-    background: 'white',
-    padding: '2rem',
-    borderRadius: '8px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
     width: '100%',
     maxWidth: '400px',
-  },
-  input: {
-    width: '100%',
-    padding: '10px',
-    marginBottom: '12px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '14px',
-    boxSizing: 'border-box',
-  },
-  button: {
-    width: '100%',
-    padding: '12px',
-    background: '#4CAF50',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    fontSize: '16px',
-    cursor: 'pointer',
-  },
-  error: {
-    color: '#f44336',
-    marginBottom: '12px',
-    fontSize: '14px',
-  },
-  fileInput: {
-    marginBottom: '12px',
-    fontSize: '14px',
+    borderRadius: '8px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
   },
 };
