@@ -2,6 +2,64 @@ import { useState } from 'react';
 import { api } from '../api';
 import { Form, Input, Button, Card, message, Upload } from 'antd';
 import { UserOutlined, LockOutlined, MailOutlined, UploadOutlined } from '@ant-design/icons';
+import { useRive, useStateMachineInput } from '@rive-app/react-canvas';
+
+function RiveAnimation({ className }) {
+  const { RiveComponent, isLoading, error } = useRive({
+    src: '/2084-4123-sign-uplogin-animation.riv',
+    autoplay: true,
+  });
+
+  if (error) {
+    return (
+      <div style={{ width: '100%', maxWidth: '400px', height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'red' }}>
+        错误: {error}
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div style={{ width: '100%', maxWidth: '400px', height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        加载中...
+      </div>
+    );
+  }
+
+  return (
+    <div className={className} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <RiveComponent style={{ width: '100%', maxWidth: '400px', height: '400px' }} />
+    </div>
+  );
+}
+
+const styles = {
+  container: {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '60px',
+    background: '#f0f2f5',
+    padding: '20px',
+  },
+  animationWrapper: {
+    flex: '0 0 400px',
+    maxWidth: '400px',
+  },
+  card: {
+    flex: '0 0 400px',
+    width: '400px',
+    borderRadius: '8px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+  },
+  switchLink: {
+    textAlign: 'center',
+    marginTop: '8px',
+    paddingTop: '8px',
+    borderTop: '1px solid #f0f0f0',
+  },
+};
 
 export function LoginPage({ onLogin, onSwitchToRegister }) {
   const [loading, setLoading] = useState(false);
@@ -23,6 +81,9 @@ export function LoginPage({ onLogin, onSwitchToRegister }) {
 
   return (
     <div style={styles.container}>
+      <div style={styles.animationWrapper}>
+        <RiveAnimation />
+      </div>
       <Card title="登录" style={styles.card}>
         <Form form={form} onFinish={onFinish} layout="vertical">
           <Form.Item
@@ -98,6 +159,9 @@ export function RegisterPage({ onRegister, onSwitchToLogin }) {
 
   return (
     <div style={styles.container}>
+      <div style={styles.animationWrapper}>
+        <RiveAnimation />
+      </div>
       <Card title="注册" style={styles.card}>
         <Form form={form} onFinish={onFinish} layout="vertical">
           <Form.Item
@@ -153,25 +217,3 @@ export function RegisterPage({ onRegister, onSwitchToLogin }) {
     </div>
   );
 }
-
-const styles = {
-  container: {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: '#f0f2f5',
-  },
-  card: {
-    width: '100%',
-    maxWidth: '400px',
-    borderRadius: '8px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-  },
-  switchLink: {
-    textAlign: 'center',
-    marginTop: '8px',
-    paddingTop: '8px',
-    borderTop: '1px solid #f0f0f0',
-  },
-};
