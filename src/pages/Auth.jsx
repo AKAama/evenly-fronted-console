@@ -6,13 +6,14 @@ import { useRive, useStateMachineInput } from '@rive-app/react-canvas';
 
 function RiveAnimation({ className }) {
   const { RiveComponent, isLoading, error } = useRive({
-    src: '/2084-4123-sign-uplogin-animation.riv',
+    src: '/22487-42095-look.riv',
+    stateMachines: "State Machine 1",
     autoplay: true,
   });
 
   if (error) {
     return (
-      <div style={{ width: '100%', maxWidth: '400px', height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'red' }}>
+      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'red', fontSize: '18px' }}>
         错误: {error}
       </div>
     );
@@ -20,15 +21,18 @@ function RiveAnimation({ className }) {
 
   if (isLoading) {
     return (
-      <div style={{ width: '100%', maxWidth: '400px', height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', color: '#fff' }}>
         加载中...
       </div>
     );
   }
 
   return (
-    <div className={className} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-      <RiveComponent style={{ width: '100%', maxWidth: '400px', height: '400px' }} />
+    <div className={className} style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <RiveComponent
+        style={{ width: '100%', height: '100%', maxWidth: '800px', maxHeight: '800px' }}
+        onMouseDown={(e) => e.preventDefault()}
+      />
     </div>
   );
 }
@@ -37,27 +41,61 @@ const styles = {
   container: {
     minHeight: '100vh',
     display: 'flex',
+    background: '#fff',
+  },
+  leftPanel: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: '60px',
+  },
+  leftTitle: {
+    color: '#333',
+    fontSize: '48px',
+    fontWeight: 'bold',
+    marginBottom: '20px',
+    textAlign: 'center',
+  },
+  leftSubtitle: {
+    color: '#666',
+    fontSize: '18px',
+    marginBottom: '40px',
+    textAlign: 'center',
+  },
+  rightPanel: {
+    flex: '0 0 720px',
+    display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '60px',
-    background: '#f0f2f5',
-    padding: '20px',
-  },
-  animationWrapper: {
-    flex: '0 0 400px',
-    maxWidth: '400px',
+    padding: '60px',
+    background: '#fff',
   },
   card: {
-    flex: '0 0 400px',
-    width: '400px',
-    borderRadius: '8px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+    width: '100%',
+    maxWidth: '380px',
+    borderRadius: '16px',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+    border: 'none',
   },
   switchLink: {
     textAlign: 'center',
-    marginTop: '8px',
-    paddingTop: '8px',
+    marginTop: '16px',
+    paddingTop: '16px',
     borderTop: '1px solid #f0f0f0',
+  },
+  inputStyle: {
+    height: '48px',
+    borderRadius: '8px',
+    background: '#f5f5f5',
+    border: 'none',
+  },
+  buttonStyle: {
+    height: '48px',
+    borderRadius: '8px',
+    fontSize: '16px',
+    fontWeight: 500,
   },
 };
 
@@ -81,30 +119,32 @@ export function LoginPage({ onLogin, onSwitchToRegister }) {
 
   return (
     <div style={styles.container}>
-      <div style={styles.animationWrapper}>
+      <div style={styles.leftPanel} onMouseDown={(e) => e.preventDefault()}>
         <RiveAnimation />
       </div>
-      <Card title="登录" style={styles.card}>
-        <Form form={form} onFinish={onFinish} layout="vertical">
-          <Form.Item
-            name="email"
-            rules={[{ required: true, message: '请输入邮箱' }, { type: 'email', message: '邮箱格式不正确' }]}
-          >
-            <Input prefix={<MailOutlined />} placeholder="邮箱" size="large" />
-          </Form.Item>
-          <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
-            <Input.Password prefix={<LockOutlined />} placeholder="密码" size="large" />
-          </Form.Item>
-          <Form.Item>
-            <Button type="primary" htmlType="submit" loading={loading} block size="large">
-              登录
-            </Button>
-          </Form.Item>
-        </Form>
-        <div style={styles.switchLink}>
-          没有账号? <Button type="link" onClick={onSwitchToRegister}>立即注册</Button>
-        </div>
-      </Card>
+      <div style={styles.rightPanel}>
+        <Card bordered={false} title="登录" style={styles.card}>
+          <Form form={form} onFinish={onFinish} layout="vertical">
+            <Form.Item
+              name="email"
+              rules={[{ required: true, message: '请输入邮箱' }, { type: 'email', message: '邮箱格式不正确' }]}
+            >
+              <Input prefix={<MailOutlined style={{ color: '#999' }} />} placeholder="邮箱" size="large" style={styles.inputStyle} />
+            </Form.Item>
+            <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
+              <Input.Password prefix={<LockOutlined style={{ color: '#999' }} />} placeholder="密码" size="large" style={styles.inputStyle} />
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" htmlType="submit" loading={loading} block size="large" style={styles.buttonStyle}>
+                登录
+              </Button>
+            </Form.Item>
+          </Form>
+          <div style={styles.switchLink}>
+            没有账号? <Button type="link" onClick={onSwitchToRegister} style={{ padding: 0, height: 'auto' }}>立即注册</Button>
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -159,61 +199,66 @@ export function RegisterPage({ onRegister, onSwitchToLogin }) {
 
   return (
     <div style={styles.container}>
-      <div style={styles.animationWrapper}>
+      <div style={styles.leftPanel} onMouseDown={(e) => e.preventDefault()}>
         <RiveAnimation />
+        <div style={styles.leftTitle}>加入我们</div>
+        <div style={styles.leftSubtitle}>创建一个账号，开始您的旅程</div>
       </div>
-      <Card title="注册" style={styles.card}>
-        <Form form={form} onFinish={onFinish} layout="vertical">
-          <Form.Item
-            name="email"
-            rules={[{ required: true, message: '请输入邮箱' }, { type: 'email', message: '邮箱格式不正确' }]}
-          >
-            <Input prefix={<MailOutlined />} placeholder="邮箱" size="large" />
-          </Form.Item>
-          <Form.Item name="code" rules={[{ required: true, message: '请输入验证码' }]}>
-            <Input.Search
-              placeholder="验证码"
-              enterButton={countdown > 0 ? `${countdown}s` : '发送验证码'}
-              onSearch={handleSendCode}
-              loading={sendingCode}
-              disabled={countdown > 0}
-              size="large"
-            />
-          </Form.Item>
-          <Form.Item name="displayName" rules={[{ required: true, message: '请输入显示名称' }]}>
-            <Input prefix={<UserOutlined />} placeholder="显示名称" size="large" />
-          </Form.Item>
-          <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }, { min: 6, message: '密码至少6位' }]}>
-            <Input.Password prefix={<LockOutlined />} placeholder="密码" size="large" />
-          </Form.Item>
-          <Form.Item name="confirmPassword" dependencies={['password']}
-            rules={[
-              { required: true, message: '请确认密码' },
-              ({ getFieldValue }) => ({
-                validator(_, value) {
-                  if (!value || getFieldValue('password') === value) return Promise.resolve();
-                  return Promise.reject(new Error('两次密码不一致'));
-                },
-              }),
-            ]}
-          >
-            <Input.Password prefix={<LockOutlined />} placeholder="确认密码" size="large" />
-          </Form.Item>
-          <Form.Item name="avatar" valuePropName="fileList" getValueFromEvent={(e) => e?.fileList}>
-            <Upload beforeUpload={() => false} maxCount={1} listType="picture">
-              <Button icon={<UploadOutlined />}>上传头像（可选）</Button>
-            </Upload>
-          </Form.Item>
-          <Form.Item>
-            <Button type="primary" htmlType="submit" loading={loading} block size="large">
-              注册
-            </Button>
-          </Form.Item>
-        </Form>
-        <div style={styles.switchLink}>
-          已有账号? <Button type="link" onClick={onSwitchToLogin}>立即登录</Button>
-        </div>
-      </Card>
+      <div style={styles.rightPanel}>
+        <Card bordered={false} title="注册" style={styles.card}>
+          <Form form={form} onFinish={onFinish} layout="vertical">
+            <Form.Item
+              name="email"
+              rules={[{ required: true, message: '请输入邮箱' }, { type: 'email', message: '邮箱格式不正确' }]}
+            >
+              <Input prefix={<MailOutlined style={{ color: '#999' }} />} placeholder="邮箱" size="large" style={styles.inputStyle} />
+            </Form.Item>
+            <Form.Item name="code" rules={[{ required: true, message: '请输入验证码' }]}>
+              <Input.Search
+                placeholder="验证码"
+                enterButton={countdown > 0 ? `${countdown}s` : '发送验证码'}
+                onSearch={handleSendCode}
+                loading={sendingCode}
+                disabled={countdown > 0}
+                size="large"
+                style={styles.inputStyle}
+              />
+            </Form.Item>
+            <Form.Item name="displayName" rules={[{ required: true, message: '请输入显示名称' }]}>
+              <Input prefix={<UserOutlined style={{ color: '#999' }} />} placeholder="显示名称" size="large" style={styles.inputStyle} />
+            </Form.Item>
+            <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }, { min: 6, message: '密码至少6位' }]}>
+              <Input.Password prefix={<LockOutlined style={{ color: '#999' }} />} placeholder="密码" size="large" style={styles.inputStyle} />
+            </Form.Item>
+            <Form.Item name="confirmPassword" dependencies={['password']}
+              rules={[
+                { required: true, message: '请确认密码' },
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    if (!value || getFieldValue('password') === value) return Promise.resolve();
+                    return Promise.reject(new Error('两次密码不一致'));
+                  },
+                }),
+              ]}
+            >
+              <Input.Password prefix={<LockOutlined style={{ color: '#999' }} />} placeholder="确认密码" size="large" style={styles.inputStyle} />
+            </Form.Item>
+            <Form.Item name="avatar" valuePropName="fileList" getValueFromEvent={(e) => e?.fileList}>
+              <Upload beforeUpload={() => false} maxCount={1} listType="picture">
+                <Button icon={<UploadOutlined />} style={{ height: '48px', borderRadius: '8px' }}>上传头像（可选）</Button>
+              </Upload>
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" htmlType="submit" loading={loading} block size="large" style={styles.buttonStyle}>
+                注册
+              </Button>
+            </Form.Item>
+          </Form>
+          <div style={styles.switchLink}>
+            已有账号? <Button type="link" onClick={onSwitchToLogin} style={{ padding: 0, height: 'auto' }}>立即登录</Button>
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }
