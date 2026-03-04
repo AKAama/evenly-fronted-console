@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '../api';
-import { Card, Row, Col, Button, Modal, Form, Input, Select, DatePicker, Table, Tag, message, Popconfirm, Space, Avatar, List, InputNumber, Tabs, Tooltip } from 'antd';
-import { PlusOutlined, DeleteOutlined, UserAddOutlined, DollarOutlined, SwapOutlined, LogoutOutlined, ArrowLeftOutlined, ReloadOutlined, ExportOutlined } from '@ant-design/icons';
+import { Card, Row, Col, Button, Modal, Form, Input, Select, DatePicker, Table, Tag, message, Popconfirm, Space, Avatar, List, InputNumber, Tabs, Tooltip, Upload, Divider } from 'antd';
+import { PlusOutlined, DeleteOutlined, UserAddOutlined, DollarOutlined, SwapOutlined, LogoutOutlined, ArrowLeftOutlined, ReloadOutlined, ExportOutlined, UserOutlined, CameraOutlined, LockOutlined } from '@ant-design/icons';
 import html2canvas from 'html2canvas';
 import dayjs from 'dayjs';
 
@@ -11,6 +11,7 @@ export function Dashboard({ onLogout }) {
   const [newLedgerName, setNewLedgerName] = useState('');
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedLedger, setSelectedLedger] = useState(null);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     loadLedgers();
@@ -57,6 +58,7 @@ export function Dashboard({ onLogout }) {
     <div style={styles.container}>
       <Card title="我的账本" extra={
         <Space>
+          <Button icon={<UserOutlined />} onClick={() => setProfileOpen(true)}>个人中心</Button>
           <Button icon={<LogoutOutlined />} onClick={onLogout}>退出</Button>
         </Space>
       } style={styles.mainCard}>
@@ -114,6 +116,8 @@ export function Dashboard({ onLogout }) {
           </Form.Item>
         </Form>
       </Modal>
+
+      <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
     </div>
   );
 }
@@ -126,6 +130,201 @@ function EmptyState({ onCreate }) {
       <p>创建一个账本开始你的AA记账之旅</p>
       <Button type="primary" icon={<PlusOutlined />} onClick={onCreate}>创建账本</Button>
     </div>
+  );
+}
+
+function ProfileModal({ open, onClose }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('profile');
+  const [profileForm] = Form.useForm();
+  const [passwordForm] = Form.useForm();
+  const [saving, setSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const avatarInputRef = useRef(null);
+
+  useEffect(() => {
+    if (open) {
+      loadUser();
+    }
+  }, [open]);
+
+  const loadUser = async () => {
+    setLoading(true);
+    try {
+      const data = await api.getMe();
+      setUser(data);
+      profileForm.setFieldsValue({
+        display_name: data.display_name || '',
+        email: data.email,
+      });
+    } catch (err) {
+      message.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateProfile = async () => {
+    try {
+      const values = await profileForm.validateFields();
+      setSaving(true);
+      await api.updateUser({ display_name: values.display_name });
+      message.success('更新成功');
+      loadUser();
+    } catch (err) {
+      if (err.errorFields) return;
+      message.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    try {
+      const values = await passwordForm.validateFields();
+      if (values.new_password !== values.confirm_password) {
+        message.error('两次输入的密码不一致');
+        return;
+      }
+      setSaving(true);
+      await api.changePassword(values.old_password, values.new_password);
+      message.success('密码修改成功');
+      passwordForm.resetFields();
+    } catch (err) {
+      if (err.errorFields) return;
+      message.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAvatarChange = async (file) => {
+    if (!file) return false;
+    setAvatarUploading(true);
+    try {
+      const updatedUser = await api.uploadAvatar(file);
+      setUser(updatedUser);
+      message.success('头像上传成功');
+    } catch (err) {
+      message.error(err.message);
+    } finally {
+      setAvatarUploading(false);
+    }
+    return false;
+  };
+
+  const avatarProps = {
+    accept: 'image/*',
+    showUploadList: false,
+    beforeUpload: handleAvatarChange,
+    disabled: avatarUploading,
+  };
+
+  return (
+    <Modal
+      title="个人中心"
+      open={open}
+      onCancel={onClose}
+      width={500}
+      footer={null}
+    >
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '40px' }}>加载中...</div>
+      ) : (
+        <Tabs activeKey={activeTab} onChange={setActiveTab} items={[
+          {
+            key: 'profile',
+            label: '个人资料',
+            children: (
+              <div style={{ textAlign: 'center', marginBottom: 24 }}>
+                <div style={{ position: 'relative', display: 'inline-block', marginBottom: 16 }}>
+                  <Avatar
+                    size={80}
+                    src={user?.avatar_url}
+                    style={{ backgroundColor: '#1890ff' }}
+                  >
+                    {user?.display_name?.[0] || user?.email?.[0]?.toUpperCase() || '?'}
+                  </Avatar>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      right: 0,
+                      background: '#1890ff',
+                      borderRadius: '50%',
+                      width: 28,
+                      height: 28,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: '#fff',
+                      fontSize: 14,
+                    }}
+                    onClick={() => avatarInputRef.current?.click()}
+                  >
+                    <CameraOutlined />
+                  </div>
+                  <input
+                    type="file"
+                    ref={avatarInputRef}
+                    style={{ display: 'none' }}
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleAvatarChange(file);
+                    }}
+                  />
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 500 }}>{user?.display_name || '未设置昵称'}</div>
+                <div style={{ color: '#999', fontSize: 12 }}>{user?.email}</div>
+              </div>
+            ),
+          },
+          {
+            key: 'account',
+            label: '账号设置',
+            children: (
+              <Form form={profileForm} layout="vertical">
+                <Form.Item name="email" label="邮箱">
+                  <Input disabled />
+                </Form.Item>
+                <Form.Item name="display_name" label="显示名称" rules={[{ max: 50, message: '最多50个字符' }]}>
+                  <Input placeholder="输入你的显示名称" />
+                </Form.Item>
+                <Button type="primary" onClick={handleUpdateProfile} loading={saving} block>
+                  保存修改
+                </Button>
+                <Divider />
+                <div style={{ marginBottom: 16 }}>
+                  <LockOutlined /> 修改密码
+                </div>
+                <Form form={passwordForm} layout="vertical">
+                  <Form.Item name="old_password" label="当前密码" rules={[{ required: true, message: '请输入当前密码' }]}>
+                    <Input.Password placeholder="请输入当前密码" />
+                  </Form.Item>
+                  <Form.Item name="new_password" label="新密码" rules={[{ required: true, message: '请输入新密码' }, { min: 6, message: '密码至少6位' }]}>
+                    <Input.Password placeholder="请输入新密码" />
+                  </Form.Item>
+                  <Form.Item name="confirm_password" label="确认新密码" rules={[{ required: true, message: '请确认新密码' }]}>
+                    <Input.Password placeholder="请再次输入新密码" />
+                  </Form.Item>
+                  <Button type="primary" danger onClick={handleChangePassword} loading={saving} block>
+                    修改密码
+                  </Button>
+                </Form>
+              </Form>
+            ),
+          },
+        ]} />
+      )}
+      {user && (
+        <div style={{ marginTop: 24, padding: '12px 16px', background: '#fafafa', borderRadius: 6, fontSize: 12, color: '#999' }}>
+          注册时间：{dayjs(user.created_at).format('YYYY-MM-DD HH:mm')}
+        </div>
+      )}
+    </Modal>
   );
 }
 

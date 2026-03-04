@@ -66,6 +66,56 @@ export const api = {
     return res.json();
   },
 
+  updateUser: async (data) => {
+    const res = await fetch(`${API_BASE}/users/me`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeader(),
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Failed to update user');
+    }
+    return res.json();
+  },
+
+  changePassword: async (oldPassword, newPassword) => {
+    const res = await fetch(`${API_BASE}/users/me/password`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeader(),
+      },
+      body: JSON.stringify({
+        old_password: oldPassword,
+        new_password: newPassword,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Failed to change password');
+    }
+    return res.json();
+  },
+
+  uploadAvatar: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${API_BASE}/users/me/avatar`, {
+      method: 'POST',
+      body: formData,
+      headers: { ...getAuthHeader() },
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Failed to upload avatar');
+    }
+    return res.json();
+  },
+
   searchUsers: async (query) => {
     const res = await fetch(`${API_BASE}/users/search?q=${encodeURIComponent(query)}`, {
       headers: { ...getAuthHeader() },

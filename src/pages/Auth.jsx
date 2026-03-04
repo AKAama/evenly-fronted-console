@@ -136,7 +136,7 @@ export function LoginPage({ onLogin, onSwitchToRegister }) {
             </Form.Item>
             <Form.Item>
               <Button type="primary" htmlType="submit" loading={loading} block size="large" style={styles.buttonStyle}>
-                登录
+                LOGIN IN
               </Button>
             </Form.Item>
           </Form>
