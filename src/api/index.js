@@ -24,12 +24,7 @@ export const api = {
     formData.append('password', password);
     formData.append('code', code);
     if (displayName) formData.append('display_name', displayName);
-    if (avatar) {
-      console.log('Uploading avatar:', avatar);
-      formData.append('avatar', avatar);
-    } else {
-      console.log('No avatar to upload');
-    }
+    if (avatar) formData.append('avatar', avatar);
 
     const res = await fetch(`${API_BASE}/auth/register`, {
       method: 'POST',
@@ -173,6 +168,25 @@ export const api = {
       body: JSON.stringify({ user_id: userId, nickname }),
     });
     if (!res.ok) throw new Error('Failed to add member');
+    return res.json();
+  },
+
+  addTemporaryMember: async (ledgerId, temporaryName) => {
+    const res = await fetch(`${API_BASE}/ledgers/${ledgerId}/members`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeader(),
+      },
+      body: JSON.stringify({
+        is_temporary: true,
+        temporary_name: temporaryName,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Failed to add temporary member');
+    }
     return res.json();
   },
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from '../api';
 import { Form, Input, Button, Card, message, Upload } from 'antd';
 import { UserOutlined, LockOutlined, MailOutlined, UploadOutlined } from '@ant-design/icons';
-import { useRive, useStateMachineInput } from '@rive-app/react-canvas';
+import { useRive } from '@rive-app/react-canvas';
 
 function RiveAnimation({ className }) {
   const { RiveComponent, isLoading, error } = useRive({

@@ -1,14 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
-import { Card, Row, Col, Button, Modal, Form, Input, Select, DatePicker, Table, Tag, message, Popconfirm, Space, Avatar, List, InputNumber, Tabs, Tooltip, Upload, Divider } from 'antd';
-import { PlusOutlined, DeleteOutlined, UserAddOutlined, DollarOutlined, SwapOutlined, LogoutOutlined, ArrowLeftOutlined, ReloadOutlined, ExportOutlined, UserOutlined, CameraOutlined, LockOutlined } from '@ant-design/icons';
+import { Card, Row, Col, Button, Modal, Form, Input, Select, DatePicker, Table, Tag, message, Popconfirm, Space, Avatar, List, InputNumber, Tabs, Tooltip, Divider } from 'antd';
+import { PlusOutlined, UserAddOutlined, DollarOutlined, SwapOutlined, LogoutOutlined, ArrowLeftOutlined, ReloadOutlined, ExportOutlined, UserOutlined, CameraOutlined, LockOutlined } from '@ant-design/icons';
 import html2canvas from 'html2canvas';
 import dayjs from 'dayjs';
 
 export function Dashboard({ onLogout }) {
   const [ledgers, setLedgers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [newLedgerName, setNewLedgerName] = useState('');
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedLedger, setSelectedLedger] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -62,14 +61,9 @@ export function Dashboard({ onLogout }) {
           <Button icon={<LogoutOutlined />} onClick={onLogout}>退出</Button>
         </Space>
       } style={styles.mainCard}>
-        <Form layout="inline" style={styles.createForm}>
-          <Form.Item>
-            <Input placeholder="账本名称" value={newLedgerName} onChange={(e) => setNewLedgerName(e.target.value)} />
-          </Form.Item>
-          <Form.Item>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModalOpen(true)}>创建账本</Button>
-          </Form.Item>
-        </Form>
+        <div style={styles.createForm}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModalOpen(true)}>创建账本</Button>
+        </div>
 
         {loading ? (
           <div style={styles.loading}>加载中...</div>
@@ -133,23 +127,20 @@ function EmptyState({ onCreate }) {
   );
 }
 
+const getUserDisplayName = (user) => user?.display_name || user?.email || '用户';
+const getUserInitial = (user) => getUserDisplayName(user)[0]?.toUpperCase() || '?';
+
 function ProfileModal({ open, onClose }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('profile');
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [profileForm] = Form.useForm();
   const [passwordForm] = Form.useForm();
   const [saving, setSaving] = useState(false);
-  const [avatarUploading, setAvatarUploading] = useState(false);
   const avatarInputRef = useRef(null);
 
-  useEffect(() => {
-    if (open) {
-      loadUser();
-    }
-  }, [open]);
-
-  const loadUser = async () => {
+  const loadUser = useCallback(async () => {
     setLoading(true);
     try {
       const data = await api.getMe();
@@ -163,7 +154,16 @@ function ProfileModal({ open, onClose }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [profileForm]);
+
+  useEffect(() => {
+    if (open) {
+      loadUser();
+    } else {
+      setShowPasswordForm(false);
+      passwordForm.resetFields();
+    }
+  }, [open, loadUser, passwordForm]);
 
   const handleUpdateProfile = async () => {
     try {
@@ -191,6 +191,7 @@ function ProfileModal({ open, onClose }) {
       await api.changePassword(values.old_password, values.new_password);
       message.success('密码修改成功');
       passwordForm.resetFields();
+      setShowPasswordForm(false);
     } catch (err) {
       if (err.errorFields) return;
       message.error(err.message);
@@ -201,7 +202,6 @@ function ProfileModal({ open, onClose }) {
 
   const handleAvatarChange = async (file) => {
     if (!file) return false;
-    setAvatarUploading(true);
     try {
       const updatedUser = await api.uploadAvatar(file);
       setUser(updatedUser);
@@ -209,30 +209,26 @@ function ProfileModal({ open, onClose }) {
     } catch (err) {
       message.error(err.message);
     } finally {
-      setAvatarUploading(false);
     }
     return false;
-  };
-
-  const avatarProps = {
-    accept: 'image/*',
-    showUploadList: false,
-    beforeUpload: handleAvatarChange,
-    disabled: avatarUploading,
   };
 
   return (
     <Modal
       title="个人中心"
       open={open}
-      onCancel={onClose}
+      onCancel={() => {
+        setShowPasswordForm(false);
+        passwordForm.resetFields();
+        onClose();
+      }}
       width={500}
       footer={null}
     >
       {loading ? (
         <div style={{ textAlign: 'center', padding: '40px' }}>加载中...</div>
       ) : (
-        <Tabs activeKey={activeTab} onChange={setActiveTab} items={[
+	        <Tabs activeKey={activeTab} onChange={setActiveTab} items={[
           {
             key: 'profile',
             label: '个人资料',
@@ -293,28 +289,36 @@ function ProfileModal({ open, onClose }) {
                 <Form.Item name="display_name" label="显示名称" rules={[{ max: 50, message: '最多50个字符' }]}>
                   <Input placeholder="输入你的显示名称" />
                 </Form.Item>
-                <Button type="primary" onClick={handleUpdateProfile} loading={saving} block>
-                  保存修改
-                </Button>
-                <Divider />
-                <div style={{ marginBottom: 16 }}>
-                  <LockOutlined /> 修改密码
-                </div>
-                <Form form={passwordForm} layout="vertical">
-                  <Form.Item name="old_password" label="当前密码" rules={[{ required: true, message: '请输入当前密码' }]}>
-                    <Input.Password placeholder="请输入当前密码" />
-                  </Form.Item>
-                  <Form.Item name="new_password" label="新密码" rules={[{ required: true, message: '请输入新密码' }, { min: 6, message: '密码至少6位' }]}>
-                    <Input.Password placeholder="请输入新密码" />
-                  </Form.Item>
-                  <Form.Item name="confirm_password" label="确认新密码" rules={[{ required: true, message: '请确认新密码' }]}>
-                    <Input.Password placeholder="请再次输入新密码" />
-                  </Form.Item>
-                  <Button type="primary" danger onClick={handleChangePassword} loading={saving} block>
-                    修改密码
-                  </Button>
-                </Form>
-              </Form>
+	                <Button type="primary" onClick={handleUpdateProfile} loading={saving} block>
+	                  保存修改
+	                </Button>
+	                <Divider />
+	                {showPasswordForm ? (
+	                  <Form form={passwordForm} layout="vertical">
+	                    <Form.Item name="old_password" label="当前密码" rules={[{ required: true, message: '请输入当前密码' }]}>
+	                      <Input.Password placeholder="请输入当前密码" />
+	                    </Form.Item>
+	                    <Form.Item name="new_password" label="新密码" rules={[{ required: true, message: '请输入新密码' }, { min: 6, message: '密码至少6位' }]}>
+	                      <Input.Password placeholder="请输入新密码" />
+	                    </Form.Item>
+	                    <Form.Item name="confirm_password" label="确认新密码" rules={[{ required: true, message: '请确认新密码' }]}>
+	                      <Input.Password placeholder="请再次输入新密码" />
+	                    </Form.Item>
+	                    <Space style={{ width: '100%' }} direction="vertical">
+	                      <Button type="primary" danger onClick={handleChangePassword} loading={saving} block>
+	                        保存新密码
+	                      </Button>
+	                      <Button onClick={() => { passwordForm.resetFields(); setShowPasswordForm(false); }} block>
+	                        取消
+	                      </Button>
+	                    </Space>
+	                  </Form>
+	                ) : (
+	                  <Button icon={<LockOutlined />} onClick={() => setShowPasswordForm(true)} block>
+	                    修改密码
+	                  </Button>
+	                )}
+	              </Form>
             ),
           },
         ]} />
@@ -340,11 +344,7 @@ function LedgerDetail({ ledger, onBack, onRefresh }) {
   const [exportOpen, setExportOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadData();
-  }, [ledger.id]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       // 获取当前用户信息
@@ -382,7 +382,11 @@ function LedgerDetail({ ledger, onBack, onRefresh }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [ledger.id]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleConfirmExpense = async (expenseId, status) => {
     try {
@@ -491,6 +495,8 @@ function LedgerDetail({ ledger, onBack, onRefresh }) {
         // 如果不是待确认状态，不显示按钮
         if (r.status !== 'pending') return '-';
         // 检查当前用户是否已经确认过
+        const splitUserIds = r.splits?.map(s => s.user_id) || [];
+        if (!splitUserIds.includes(currentUser?.id)) return '-';
         const hasConfirmed = r.confirmations?.some(c => c.user_id === currentUser?.id);
         if (hasConfirmed) return '已确认';
         return (
@@ -509,7 +515,9 @@ function LedgerDetail({ ledger, onBack, onRefresh }) {
       key: 'user',
       render: (_, r) => (
         <Space>
-          <Avatar style={{ backgroundColor: '#1890ff' }}>{r.user?.display_name?.[0] || r.user?.email?.[0]?.toUpperCase() || '?'}</Avatar>
+          <Avatar src={r.user?.avatar_url} style={{ backgroundColor: r.is_temporary ? '#fa8c16' : '#1890ff' }}>
+            {r.is_temporary ? (r.temporary_name?.[0] || '?') : getUserInitial(r.user)}
+          </Avatar>
           <span>{r.nickname || r.user?.display_name || r.user?.email}</span>
         </Space>
       )
@@ -561,7 +569,7 @@ function LedgerDetail({ ledger, onBack, onRefresh }) {
 
         <Tabs activeKey={activeTab} onChange={setActiveTab} style={{ marginTop: '16px' }} items={[
           { key: 'expenses', label: `支出 (${expenses.length})`, children: <Table columns={expenseColumns} dataSource={expenses} rowKey="id" loading={loading} pagination={false} /> },
-          { key: 'members', label: `成员 (${members.length})`, children: <Table columns={memberColumns} dataSource={members} rowKey="user_id" loading={loading} pagination={false} /> },
+          { key: 'members', label: `成员 (${members.length})`, children: <Table columns={memberColumns} dataSource={members} rowKey={(row) => row.id || row.user_id} loading={loading} pagination={false} /> },
           { key: 'settlements', label: `结算 (${settlements.length})`, children: <Table columns={settlementColumns} dataSource={settlements} rowKey="id" loading={loading} pagination={false} /> },
         ]} />
       </Card>
@@ -570,7 +578,7 @@ function LedgerDetail({ ledger, onBack, onRefresh }) {
         open={addMemberOpen}
         onCancel={() => setAddMemberOpen(false)}
         ledgerId={ledger.id}
-        existingIds={members.map(m => m.user_id)}
+        existingIds={members.map(m => m.user_id).filter(Boolean)}
         onSuccess={() => { setAddMemberOpen(false); loadData(); }}
       />
 
@@ -605,16 +613,18 @@ function LedgerDetail({ ledger, onBack, onRefresh }) {
 
 function AddMemberModal({ open, onCancel, ledgerId, existingIds, onSuccess }) {
   const [search, setSearch] = useState('');
+  const [temporaryName, setTemporaryName] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [addingId, setAddingId] = useState(null);
+  const [addingTemporary, setAddingTemporary] = useState(false);
 
   const handleSearch = async () => {
     if (!search.trim()) return;
     setSearching(true);
     try {
       const users = await api.searchUsers(search);
-      setResults(users.filter(u => !existingIds.includes(u.id)));
+      setResults(users);
     } catch (err) {
       message.error(err.message);
     } finally {
@@ -634,21 +644,60 @@ function AddMemberModal({ open, onCancel, ledgerId, existingIds, onSuccess }) {
     }
   };
 
+  const handleAddTemporary = async () => {
+    const name = temporaryName.trim();
+    if (!name) {
+      message.warning('请输入临时成员名称');
+      return;
+    }
+    setAddingTemporary(true);
+    try {
+      await api.addTemporaryMember(ledgerId, name);
+      message.success('临时成员添加成功');
+      setTemporaryName('');
+      onSuccess();
+    } catch (err) {
+      message.error(err.message);
+    } finally {
+      setAddingTemporary(false);
+    }
+  };
+
   return (
     <Modal title="添加成员" open={open} onCancel={onCancel} footer={null} width={500}>
       <Space.Compact style={{ width: '100%', marginBottom: 16 }}>
         <Input placeholder="搜索邮箱或用户名" value={search} onChange={(e) => setSearch(e.target.value)} onPressEnter={handleSearch} />
         <Button type="primary" loading={searching} onClick={handleSearch}>搜索</Button>
       </Space.Compact>
+      <Space.Compact style={{ width: '100%', marginBottom: 16 }}>
+        <Input placeholder="临时成员名称" value={temporaryName} onChange={(e) => setTemporaryName(e.target.value)} onPressEnter={handleAddTemporary} />
+        <Button loading={addingTemporary} onClick={handleAddTemporary}>添加临时成员</Button>
+      </Space.Compact>
       <List
         dataSource={results}
-        renderItem={(user) => (
-          <List.Item actions={[
-            <Button key="add" type="primary" size="small" loading={addingId === user.id} onClick={() => handleAdd(user.id)}>添加</Button>
-          ]}>
-            <List.Item.Meta avatar={<Avatar>{user.display_name?.[0] || user.email[0].toUpperCase()}</Avatar>} title={user.display_name || user.email} description={user.email} />
-          </List.Item>
-        )}
+        renderItem={(user) => {
+          const isAdded = existingIds.includes(user.id);
+          return (
+            <List.Item actions={[
+              <Button
+                key="add"
+                type="primary"
+                size="small"
+                disabled={isAdded}
+                loading={addingId === user.id}
+                onClick={() => handleAdd(user.id)}
+              >
+                {isAdded ? '已添加' : '添加'}
+              </Button>
+            ]}>
+              <List.Item.Meta
+                avatar={<Avatar src={user.avatar_url}>{getUserInitial(user)}</Avatar>}
+                title={getUserDisplayName(user)}
+                description={user.email}
+              />
+            </List.Item>
+          );
+        }}
         locale={{ emptyText: '搜索用户' }}
       />
     </Modal>
@@ -662,14 +711,14 @@ function CreateExpenseModal({ open, onCancel, ledgerId, members, onSuccess }) {
   const [loading, setLoading] = useState(false);
 
   const amount = Form.useWatch('amount', form);
-  const membersList = members || [];
+  const membersList = useMemo(() => (members || []).filter(m => m.user_id), [members]);
 
   useEffect(() => {
     if (amount && membersList.length > 0 && splitType === 'equal') {
       const equal = (parseFloat(amount) / membersList.length).toFixed(2);
       setSplits(membersList.map(m => ({ userId: m.user_id, amount: parseFloat(equal) })));
     }
-  }, [amount, membersList.length, splitType]);
+  }, [amount, membersList, splitType]);
 
   const handleAmountChange = (value) => {
     if (splitType === 'equal' && value && membersList.length > 0) {
@@ -756,6 +805,7 @@ function CreateExpenseModal({ open, onCancel, ledgerId, members, onSuccess }) {
 function CreateSettlementModal({ open, onCancel, ledgerId, members, onSuccess }) {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const registeredMembers = (members || []).filter(m => m.user_id);
 
   const handleSubmit = async () => {
     try {
@@ -777,12 +827,12 @@ function CreateSettlementModal({ open, onCancel, ledgerId, members, onSuccess })
       <Form form={form} layout="vertical">
         <Form.Item name="from_user_id" label="付款人" rules={[{ required: true }]}>
           <Select placeholder="选择付款人">
-            {members.map(m => <Select.Option key={m.user_id} value={m.user_id}>{m.nickname || m.user?.display_name || m.user?.email}</Select.Option>)}
+            {registeredMembers.map(m => <Select.Option key={m.user_id} value={m.user_id}>{m.nickname || m.user?.display_name || m.user?.email}</Select.Option>)}
           </Select>
         </Form.Item>
         <Form.Item name="to_user_id" label="收款人" rules={[{ required: true }]}>
           <Select placeholder="选择收款人">
-            {members.map(m => <Select.Option key={m.user_id} value={m.user_id}>{m.nickname || m.user?.display_name || m.user?.email}</Select.Option>)}
+            {registeredMembers.map(m => <Select.Option key={m.user_id} value={m.user_id}>{m.nickname || m.user?.display_name || m.user?.email}</Select.Option>)}
           </Select>
         </Form.Item>
         <Form.Item name="amount" label="金额" rules={[{ required: true }]}>
@@ -799,8 +849,6 @@ function CreateSettlementModal({ open, onCancel, ledgerId, members, onSuccess })
 function ExportPreviewModal({ open, onCancel, ledger, members, expenses, settlements, onExport }) {
   // 计算统计数据
   const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.total_amount), 0);
-  const confirmedCount = expenses.filter(e => e.status === 'confirmed').length;
-  const pendingCount = expenses.filter(e => e.status === 'pending').length;
 
   return (
     <Modal
@@ -847,7 +895,7 @@ function ExportPreviewModal({ open, onCancel, ledger, members, expenses, settlem
           <h3 style={{ fontSize: '14px', color: '#333', borderLeft: '3px solid #1890ff', paddingLeft: '8px', marginBottom: '12px' }}>参与成员</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {members.map(m => (
-              <Tag key={m.user_id} color="blue" style={{ padding: '4px 12px' }}>
+              <Tag key={m.id || m.user_id} color={m.is_temporary ? 'orange' : 'blue'} style={{ padding: '4px 12px' }}>
                 {m.nickname || m.user?.display_name || m.user?.email}
               </Tag>
             ))}
